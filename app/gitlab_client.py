@@ -31,6 +31,17 @@ class GitLabClient:
         self._headers = {"PRIVATE-TOKEN": token}
         self._timeout = timeout
 
+    def get_all(self, path: str, params: dict | None = None) -> list[dict]:
+        merged = dict(params or {})
+        merged.setdefault("per_page", 100)
+        results: list[dict] = []
+        page: int | None = 1
+        while page is not None:
+            page_params = {**merged, "page": page}
+            data, page = self._get_page(path, page_params)
+            results.extend(data)
+        return results
+
     def _get_page(self, path: str, params: dict):
         url = f"{self._base_url}/api/v4{path}"
         try:
