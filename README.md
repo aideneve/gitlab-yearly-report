@@ -19,6 +19,7 @@ updates, or deletes anything in GitLab.
 - [API reference](#api-reference)
 - [Example curl commands](#example-curl-commands)
 - [Running the tests](#running-the-tests)
+- [MCP server (bonus)](#mcp-server-bonus)
 - [Design notes](#design-notes)
 - [Local GitLab playground](#local-gitlab-playground)
 
@@ -195,6 +196,62 @@ multiple pages, the `scope=all` behavior, project-path URL encoding, error
 mapping (401/403/404/502), input validation (missing/invalid year), and the
 health endpoint.
 
+## MCP server (bonus)
+
+In addition to the HTTP API, the same two functions are exposed as tools over
+the Model Context Protocol (MCP), so an MCP-aware client (such as Claude
+Desktop) can call them directly.
+
+Required MCP tools:
+
+- `get_issues_by_year(year, project=None)`
+- `get_merge_requests_by_year(year, project=None)`
+
+The MCP server reuses the exact same reporting logic (`app/reports.py`) and
+configuration as the web service, so it reads `GITLAB_URL` and `GITLAB_TOKEN`
+from the environment the same way. It communicates over stdio.
+
+Install its dependencies (kept separate from the web service so each stays
+lean):
+
+```bash
+pip install -r requirements-mcp.txt
+```
+
+Run it directly:
+
+```bash
+export GITLAB_URL="https://gitlab.com"
+export GITLAB_TOKEN="glpat-xxxxxxxxxxxxxxxxxxxx"
+python -m app.mcp_server
+```
+
+Test it interactively with the MCP Inspector (requires Node.js):
+
+```bash
+npx @modelcontextprotocol/inspector python -m app.mcp_server
+```
+
+Register it with an MCP client (for example Claude Desktop's
+`claude_desktop_config.json`). Use absolute paths, and point `command` at the
+project's virtual-environment Python:
+
+```json
+{
+  "mcpServers": {
+    "gitlab-yearly-report": {
+      "command": "/absolute/path/to/.venv/bin/python",
+      "args": ["-m", "app.mcp_server"],
+      "cwd": "/absolute/path/to/gitlab-yearly-report",
+      "env": {
+        "GITLAB_URL": "https://gitlab.com",
+        "GITLAB_TOKEN": "glpat-xxxxxxxxxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
 ## Design notes
 
 **Why `scope=all` matters.** GitLab's instance-wide `/issues` and
@@ -233,6 +290,11 @@ locally.
 **Pagination.** GitLab paginates list responses. The client requests
 `per_page=100` and follows the `X-Next-Page` response header until it is empty,
 concatenating every page.
+
+**Two protocols, one core.** The HTTP API (`app/main.py`) and the MCP server
+(`app/mcp_server.py`) are both thin adapters over the same reporting core
+(`app/reports.py` + `app/gitlab_client.py`). The GitLab logic is written once
+and reused, so the two entry points cannot drift apart.
 
 ## Local GitLab playground
 
