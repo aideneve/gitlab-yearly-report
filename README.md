@@ -204,6 +204,16 @@ entire instance "according to the permissions of the provided token," the
 service explicitly sends `scope=all`. Without this, instance-wide reports would
 silently under-report.
 
+**Instance-wide scope on GitLab.com vs self-hosted.** The instance-wide
+`scope=all` query is designed for a self-hosted instance (the assignment's
+GitLab 18.10 playground), where it returns everything the token may see almost
+instantly. On GitLab.com the same query asks GitLab to scan issues across the
+entire public instance and hits GitLab.com's statement-timeout guard, returning
+`500`, which this service faithfully surfaces as `502 Bad Gateway`. This is a
+GitLab.com scale limitation, not a defect in the service. Project-scoped
+reports (`?project=...`) work identically on both GitLab.com and self-hosted.
+Validate instance-wide reporting against a self-hosted instance.
+
 **Raw REST instead of a client library.** The service calls the GitLab REST API
 directly with `httpx` rather than using the `python-gitlab` library. This keeps
 the interaction with the API explicit — authentication, pagination, and query
